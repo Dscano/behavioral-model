@@ -29,70 +29,86 @@
 
 #include "simple_switch.h"
 
-namespace {
-SimpleSwitch *simple_switch;
-}  // namespace
+namespace
+{
+    SimpleSwitch *simple_switch;
+} // namespace
 
-namespace sswitch_runtime {
-shared_ptr<SimpleSwitchIf> get_handler(SimpleSwitch *sw);
-}  // namespace sswitch_runtime
+namespace sswitch_runtime
+{
+    shared_ptr<SimpleSwitchIf> get_handler(SimpleSwitch *sw);
+} // namespace sswitch_runtime
 
-int
-main(int argc, char* argv[]) {
-  bm::TargetParserBasicWithDynModules simple_switch_parser;
-  simple_switch_parser.add_flag_option(
-      "enable-swap",
-      "Enable JSON swapping at runtime");
-  simple_switch_parser.add_uint_option(
-      "drop-port",
-      "Choose drop port number (default is 511)");
-  simple_switch_parser.add_uint_option(
-      "priority-queues",
-      "Number of priority queues (default is 1)");
+int main(int argc, char *argv[])
+{
+    bm::TargetParserBasicWithDynModules simple_switch_parser;
+    simple_switch_parser.add_flag_option(
+        "enable-swap",
+        "Enable JSON swapping at runtime");
+    simple_switch_parser.add_uint_option(
+        "drop-port",
+        "Choose drop port number (default is 511)");
+    simple_switch_parser.add_uint_option(
+        "priority-queues",
+        "Number of priority queues (default is 1)");
+    simple_switch_parser.add_string_option(
+        "table-lookups",
+        "Algorithm used for table lookups (allowed: linear, tss; default is linear)");
 
-  bm::OptionsParser parser;
-  parser.parse(argc, argv, &simple_switch_parser);
+    bm::OptionsParser parser;
+    parser.parse(argc, argv, &simple_switch_parser);
 
-  bool enable_swap_flag = false;
-  if (simple_switch_parser.get_flag_option("enable-swap", &enable_swap_flag)
-      != bm::TargetParserBasic::ReturnCode::SUCCESS) {
-    std::exit(1);
-  }
+    bool enable_swap_flag = false;
+    if (simple_switch_parser.get_flag_option("enable-swap", &enable_swap_flag) != bm::TargetParserBasic::ReturnCode::SUCCESS)
+    {
+        std::exit(1);
+    }
 
-  uint32_t drop_port = 0xffffffff;
-  {
-    auto rc = simple_switch_parser.get_uint_option("drop-port", &drop_port);
-    if (rc == bm::TargetParserBasic::ReturnCode::OPTION_NOT_PROVIDED)
-      drop_port = SimpleSwitch::default_drop_port;
-    else if (rc != bm::TargetParserBasic::ReturnCode::SUCCESS)
-      std::exit(1);
-  }
+    uint32_t drop_port = 0xffffffff;
+    {
+        auto rc = simple_switch_parser.get_uint_option("drop-port", &drop_port);
+        if (rc == bm::TargetParserBasic::ReturnCode::OPTION_NOT_PROVIDED)
+            drop_port = SimpleSwitch::default_drop_port;
+        else if (rc != bm::TargetParserBasic::ReturnCode::SUCCESS)
+            std::exit(1);
+    }
 
-  uint32_t priority_queues = 0xffffffff;
-  {
-    auto rc = simple_switch_parser.get_uint_option(
-        "priority-queues", &priority_queues);
-    if (rc == bm::TargetParserBasic::ReturnCode::OPTION_NOT_PROVIDED)
-      priority_queues = SimpleSwitch::default_nb_queues_per_port;
-    else if (rc != bm::TargetParserBasic::ReturnCode::SUCCESS)
-      std::exit(1);
-  }
+    uint32_t priority_queues = 0xffffffff;
+    {
+        auto rc = simple_switch_parser.get_uint_option(
+            "priority-queues", &priority_queues);
+        if (rc == bm::TargetParserBasic::ReturnCode::OPTION_NOT_PROVIDED)
+            priority_queues = SimpleSwitch::default_nb_queues_per_port;
+        else if (rc != bm::TargetParserBasic::ReturnCode::SUCCESS)
+            std::exit(1);
+    }
+    std::string table_lookups = "linear";
+    {
+        auto rc = simple_switch_parser.get_string_option(
+            "table-lookups", &table_lookups);
+        if (rc == bm::TargetParserBasic::ReturnCode::OPTION_NOT_PROVIDED)
+            table_lookups = SimpleSwitch::default_table_lookup;
+        else if (rc != bm::TargetParserBasic::ReturnCode::SUCCESS)
+            std::exit(1);
+    }
 
-  simple_switch = new SimpleSwitch(enable_swap_flag, drop_port,
-                                   priority_queues);
+    simple_switch = new SimpleSwitch(enable_swap_flag, drop_port,
+                                     priority_queues);
 
-  int status = simple_switch->init_from_options_parser(parser);
-  if (status != 0) std::exit(status);
+    int status = simple_switch->init_from_options_parser(parser);
+    if (status != 0)
+        std::exit(status);
 
-  int thrift_port = simple_switch->get_runtime_port();
-  bm_runtime::start_server(simple_switch, thrift_port);
-  using ::sswitch_runtime::SimpleSwitchIf;
-  using ::sswitch_runtime::SimpleSwitchProcessor;
-  bm_runtime::add_service<SimpleSwitchIf, SimpleSwitchProcessor>(
-      "simple_switch", sswitch_runtime::get_handler(simple_switch));
-  simple_switch->start_and_return();
+    int thrift_port = simple_switch->get_runtime_port();
+    bm_runtime::start_server(simple_switch, thrift_port);
+    using ::sswitch_runtime::SimpleSwitchIf;
+    using ::sswitch_runtime::SimpleSwitchProcessor;
+    bm_runtime::add_service<SimpleSwitchIf, SimpleSwitchProcessor>(
+        "simple_switch", sswitch_runtime::get_handler(simple_switch));
+    simple_switch->start_and_return();
 
-  while (true) std::this_thread::sleep_for(std::chrono::seconds(100));
+    while (true)
+        std::this_thread::sleep_for(std::chrono::seconds(100));
 
-  return 0;
+    return 0;
 }
